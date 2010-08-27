@@ -55,8 +55,8 @@ static int mod_fortune_method_handler (request_rec *r)
     }
     // otherwise funnel pipe's output into cstring and set as environment variable
     else {
-        // TODO: fgets cuts off @ first newline...need to keep reading until EOF
-        fgets(fortune_output, sizeof(fortune_output)-1, fortune_pipe);
+        int fortune_size = fread(fortune_output, sizeof(char), sizeof(fortune_output)-1, fortune_pipe);
+        fortune_output[ fortune_size ] = '\0';
         pclose(fortune_pipe);
         apr_table_set(r->subprocess_env, "FORTUNE_COOKIE", mod_fortune_chomp_output(fortune_output) );
     }
