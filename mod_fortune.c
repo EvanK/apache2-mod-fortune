@@ -43,10 +43,13 @@ static char* mod_fortune_chomp_output(char* str)
 static int mod_fortune_method_handler (request_rec *r)
 {
     // assuming short fortune to be 160 chars (plus null char)
+    // TODO: allow custom fortune max size from an optional config directive (ie: FortuneMaxLength), defaulting to 160 + 1
     char fortune_output[161];
     FILE *fortune_pipe;
     
     // invoke "fortune -s" in a subshell
+    // TODO: get fortune binary location from optional config directive (ie: FortuneProgram), defaulting to /usr/games/fortune, and verify it exists and is executable
+    // TODO: add "-n <maxlength>" to subshell command
     char fortune_cmd[] = "/usr/games/fortune -s";
     fortune_pipe = popen(fortune_cmd, "r");
     // if opening pipe fails, write a message to stderr
