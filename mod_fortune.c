@@ -25,6 +25,7 @@
  */
 #include "httpd.h"
 #include "http_config.h"
+#include "http_log.h"
 
 /*
  * This module
@@ -67,13 +68,14 @@ static int mod_fortune_method_handler (request_rec *r)
     fortune_pipe = popen(fortune_cmd, "r");
     // if opening pipe fails, write a message to stderr
     if (fortune_pipe == NULL) {
-        fprintf(stderr,"apache2_mod_fortune: Failed to open a pipe to '%s'.\n", fortune_cmd);
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "mod_fortune: Failed to open pipe to %s", fortune_cmd);
     }
     // otherwise funnel pipe's output into cstring and set as environment variable
     else {
         int fortune_size = fread(fortune_output, sizeof(char), sizeof(fortune_output)-1, fortune_pipe);
         fortune_output[ fortune_size ] = '\0';
         pclose(fortune_pipe);
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, "mod_fortune: Retrieved fortune of %d chars", (int)strlen(fortune_output));
         apr_table_set(r->subprocess_env, "FORTUNE_COOKIE", mod_fortune_chomp_output(fortune_output) );
     }
     
