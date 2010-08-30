@@ -27,6 +27,19 @@
 #include "http_config.h"
 
 /*
+ * This module
+ */
+module AP_MODULE_DECLARE_DATA fortune_module;
+
+/*
+ * This modules per-server configuration structure.
+ */
+typedef struct {
+    int maxlen;
+    char *binloc;
+} modfortune_config;
+
+/*
  * Remove trailing newline(s) from pipe output
  */
 static char* mod_fortune_chomp_output(char* str)
@@ -70,6 +83,39 @@ static int mod_fortune_method_handler (request_rec *r)
     return DECLINED;
 }
 
+/**
+ * A declaration of the configuration directives that are supported by this module.
+ */
+static const command_rec mod_fortune_cmds[] =
+{
+	AP_INIT_TAKE1(
+		"FortuneMaxLength",
+		ap_set_int_slot,
+		(void*)APR_OFFSETOF(modfortune_config, maxlen),
+		OR_ALL,//RSRC_CONF,
+		"FortuneMaxLength <integer> -- the maximum length in characters of fortune to retrieve."
+	),
+	AP_INIT_TAKE1(
+		"FortuneProgram",
+		ap_set_string_slot,
+		(void*)APR_OFFSETOF(modfortune_config, binloc),
+		OR_ALL,//RSRC_CONF,
+		"FortuneProgram <string> -- the location of the executable fortune binary."
+	),
+	{NULL}
+};
+
+/**
+ * Creates the per-server configuration records.
+ */
+static void* create_modfortune_config(apr_pool_t* pool, server_rec* s) {
+	modfortune_config* svr = apr_pcalloc(pool, sizeof(modfortune_config));
+	/* Set up the default values for fields of svr */
+	svr->maxlen = 160;
+	svr->binloc = "/usr/games/fortune";
+	return svr ;
+}
+
 /*
  * This function is a callback and it declares what other functions
  * should be called for request processing and configuration requests.
@@ -88,9 +134,9 @@ module AP_MODULE_DECLARE_DATA fortune_module =
     STANDARD20_MODULE_STUFF,
     NULL,
     NULL,
+    create_modfortune_config,   /* Create config rec for host */
     NULL,
-    NULL,
-    NULL,
-    mod_fortune_register_hooks,            /* callback for registering hooks */
+    mod_fortune_cmds,           /* Configuration directives */
+    mod_fortune_register_hooks, /* Hook into APR API */
 };
 
