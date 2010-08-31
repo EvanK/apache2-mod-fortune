@@ -35,9 +35,9 @@ module AP_MODULE_DECLARE_DATA fortune_module;
 /*
  * This modules per-server configuration structure.
  */
-typedef struct {
-    int maxlen;
-    char *binloc;
+typedef struct modfortune_config {
+    const char *maxlen;
+    const char *binloc;
 } modfortune_config;
 
 /*
@@ -56,28 +56,44 @@ static char* mod_fortune_chomp_output(char* str)
  */
 static int mod_fortune_method_handler (request_rec *r)
 {
-    // assuming short fortune to be 160 chars (plus null char)
-    // TODO: allow custom fortune max size from an optional config directive (ie: FortuneMaxLength), defaulting to 160 + 1
-    char fortune_output[161];
-    FILE *fortune_pipe;
+    // Get the module configuration
+    modfortune_config* svr = ap_get_module_config(r->server->module_config, &fortune_module);
     
-    // invoke "fortune -s" in a subshell
-    // TODO: get fortune binary location from optional config directive (ie: FortuneProgram), defaulting to /usr/games/fortune, and verify it exists and is executable
-    // TODO: add "-n <maxlength>" to subshell command
-    char fortune_cmd[] = "/usr/games/fortune -s";
+    // estimate size of fortune output from config directive (short circuit if maxlen is not positive int)
+    int maxlen = atoi(svr->maxlen);
+    if(maxlen < 1) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "mod_fortune: FortuneMaxLength must be a positive integer, is '%d'", maxlen);
+        return DECLINED;
+    }
+    char *fortune_output = (char *) malloc((maxlen + 1) * sizeof(char));
+    strcpy(fortune_output, "");
+    
+    // TODO: verify fortune binary exists and is executable
+    
+    // dynamically allocate fortune_cmd based on size of its pieces (from config directives)
+    char *fortune_cmd = (char *) malloc((strlen(svr->binloc) + strlen(svr->maxlen) + 10) * sizeof(char));
+    sprintf(fortune_cmd, "%s -n %s -s", svr->binloc, svr->maxlen);
+    
+    // invoke in a subshell
+    FILE *fortune_pipe;
     fortune_pipe = popen(fortune_cmd, "r");
-    // if opening pipe fails, write a message to stderr
+    
+    // if opening pipe fails, log a warning
     if (fortune_pipe == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "mod_fortune: Failed to open pipe to %s", fortune_cmd);
     }
     // otherwise funnel pipe's output into cstring and set as environment variable
     else {
-        int fortune_size = fread(fortune_output, sizeof(char), sizeof(fortune_output)-1, fortune_pipe);
+        int fortune_size = fread(fortune_output, sizeof(char), maxlen, fortune_pipe);
         fortune_output[ fortune_size ] = '\0';
         pclose(fortune_pipe);
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, "mod_fortune: Retrieved fortune of %d chars", (int)strlen(fortune_output));
         apr_table_set(r->subprocess_env, "FORTUNE_COOKIE", mod_fortune_chomp_output(fortune_output) );
     }
+    
+    // deallocate dynamic cstrings we no longer need
+    free(fortune_output);
+    free(fortune_cmd);
     
     // Return DECLINED so that the Apache core will keep looking for
     // other modules to handle this request.  This effectively makes
@@ -92,7 +108,7 @@ static const command_rec mod_fortune_cmds[] =
 {
 	AP_INIT_TAKE1(
 		"FortuneMaxLength",
-		ap_set_int_slot,
+		ap_set_string_slot,
 		(void*)APR_OFFSETOF(modfortune_config, maxlen),
 		OR_ALL,//RSRC_CONF,
 		"FortuneMaxLength <integer> -- the maximum length in characters of fortune to retrieve."
@@ -113,7 +129,7 @@ static const command_rec mod_fortune_cmds[] =
 static void* create_modfortune_config(apr_pool_t* pool, server_rec* s) {
 	modfortune_config* svr = apr_pcalloc(pool, sizeof(modfortune_config));
 	/* Set up the default values for fields of svr */
-	svr->maxlen = 160;
+	svr->maxlen = "160";
 	svr->binloc = "/usr/games/fortune";
 	return svr ;
 }
