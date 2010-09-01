@@ -23,6 +23,9 @@
 /*
  * Include the core server components.
  */
+
+#include "apr_lib.h"
+
 #include "httpd.h"
 #include "http_config.h"
 #include "http_log.h"
@@ -35,7 +38,7 @@ module AP_MODULE_DECLARE_DATA fortune_module;
 /*
  * This modules per-server configuration structure.
  */
-typedef struct modfortune_config {
+typedef struct {
     const char *maxlen;
     const char *binloc;
 } modfortune_config;
@@ -61,10 +64,6 @@ static int mod_fortune_method_handler (request_rec *r)
     
     // estimate size of fortune output from config directive (short circuit if maxlen is not positive int)
     int maxlen = atoi(svr->maxlen);
-    if(maxlen < 1) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "mod_fortune: FortuneMaxLength must be a positive integer, is '%d'", maxlen);
-        return DECLINED;
-    }
     char *fortune_output = (char *) malloc((maxlen + 1) * sizeof(char));
     strcpy(fortune_output, "");
     
@@ -101,37 +100,56 @@ static int mod_fortune_method_handler (request_rec *r)
     return DECLINED;
 }
 
+/*
+* Set the max length of fortunes to retrieve
+*/
+static const char * set_fortune_maxlen(cmd_parms *parms, void *dummy, const char *arg)
+{
+    modfortune_config* svr = ap_get_module_config(parms->server->module_config, &fortune_module);
+    
+    if (!apr_isdigit(arg[0]))
+        return "FortuneMaxLength: length must be numeric";
+    
+    int maxlen = atoi((char *)arg);
+    if (maxlen < 1)
+        return "FortuneMaxLength: must be at least one character long";
+    
+    svr->maxlen = (char *) arg;
+    
+    return NULL;
+}
+
 /**
  * A declaration of the configuration directives that are supported by this module.
  */
 static const command_rec mod_fortune_cmds[] =
 {
-	AP_INIT_TAKE1(
-		"FortuneMaxLength",
-		ap_set_string_slot,
-		(void*)APR_OFFSETOF(modfortune_config, maxlen),
-		OR_ALL,//RSRC_CONF,
-		"FortuneMaxLength <integer> -- the maximum length in characters of fortune to retrieve."
-	),
-	AP_INIT_TAKE1(
-		"FortuneProgram",
-		ap_set_string_slot,
-		(void*)APR_OFFSETOF(modfortune_config, binloc),
-		OR_ALL,//RSRC_CONF,
-		"FortuneProgram <string> -- the location of the executable fortune binary."
-	),
-	{NULL}
+    AP_INIT_TAKE1(
+        "FortuneMaxLength",
+        set_fortune_maxlen,
+        NULL,
+        OR_ALL,//RSRC_CONF,
+        "FortuneMaxLength <integer> -- the maximum length in characters of fortune to retrieve."
+    ),
+    AP_INIT_TAKE1(
+        "FortuneProgram",
+        ap_set_string_slot,
+        (void*)APR_OFFSETOF(modfortune_config, binloc),
+        OR_ALL,//RSRC_CONF,
+        "FortuneProgram <string> -- the location of the executable fortune binary."
+    ),
+    {NULL}
 };
 
 /**
  * Creates the per-server configuration records.
  */
 static void* create_modfortune_config(apr_pool_t* pool, server_rec* s) {
-	modfortune_config* svr = apr_pcalloc(pool, sizeof(modfortune_config));
-	/* Set up the default values for fields of svr */
-	svr->maxlen = "160";
-	svr->binloc = "/usr/games/fortune";
-	return svr ;
+    modfortune_config* svr = apr_pcalloc(pool, sizeof(modfortune_config));
+    /* Set up the default values for fields of svr */
+    svr->maxlen = "160";
+    svr->binloc = "/usr/games/fortune";
+    return svr ;
 }
 
 /*
