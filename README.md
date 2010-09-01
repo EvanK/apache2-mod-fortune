@@ -25,4 +25,22 @@ I wrote this mostly for fun and because it's been a while since I dabbled in the
 Licensing
 --
 This software is released as open source under the MIT license:
-http://www.opensource.org/licenses/mit-license.php
+    http://www.opensource.org/licenses/mit-license.php
+
+
+Usage Example
+--
+This is an example configuration that would insert an `X-Fortune` header to every successful request.
+    # if mod_header is enabled...
+    <IfModule mod_header.c>
+        # load and configure mod_fortune (default path but custom max length)
+        LoadModule fortune_module modules/mod_fortune.so
+        
+        <IfModule mod_fortune.c>
+            FortuneMaxLength 1000
+            #FortuneProgram /usr/games/fortune
+        </IfModule>
+        
+        # set X-Fortune header for successful response, if env variable exists
+        Header onsuccess set X-Fortune %{FORTUNE_COOKIE}e env=FORTUNE_COOKIE
+    </IfModule>
