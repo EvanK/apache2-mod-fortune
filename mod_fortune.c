@@ -110,7 +110,7 @@ static int mod_fortune_method_handler (request_rec *r)
 /*
  * Set the max length of fortunes to retrieve
  */
-static const char * set_fortune_maxlen(cmd_parms *parms, void *dummy, const char *arg)
+static const char * set_modfortune_maxlen(cmd_parms *parms, void *dummy, const char *arg)
 {
     if (!apr_isdigit(arg[0]))
         return "FortuneMaxLength: length must be numeric";
@@ -127,7 +127,7 @@ static const char * set_fortune_maxlen(cmd_parms *parms, void *dummy, const char
 /*
  * Set the location of the executable fortune binary
  */
-static const char * set_fortune_binloc(cmd_parms *parms, void *dummy, const char *arg)
+static const char * set_modfortune_binloc(cmd_parms *parms, void *dummy, const char *arg)
 {
     char *binloc = (char *) arg;
     
@@ -150,14 +150,14 @@ static const command_rec mod_fortune_cmds[] =
 {
     AP_INIT_TAKE1(
         "FortuneMaxLength",
-        set_fortune_maxlen,
+        set_modfortune_maxlen,
         NULL,
         OR_ALL,//RSRC_CONF,
         "FortuneMaxLength <integer> -- the maximum length in characters of fortune to retrieve."
     ),
     AP_INIT_TAKE1(
         "FortuneProgram",
-        set_fortune_binloc,
+        set_modfortune_binloc,
         NULL,
         OR_ALL,//RSRC_CONF,
         "FortuneProgram <string> -- the location of the executable fortune binary."
