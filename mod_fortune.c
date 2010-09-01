@@ -24,6 +24,8 @@
  * Include the core server components.
  */
 
+#include <unistd.h>
+
 #include "apr_lib.h"
 
 #include "httpd.h"
@@ -67,8 +69,6 @@ static int mod_fortune_method_handler (request_rec *r)
     char *fortune_output = (char *) malloc((maxlen + 1) * sizeof(char));
     strcpy(fortune_output, "");
     
-    // TODO: verify fortune binary exists and is executable
-    
     // dynamically allocate fortune_cmd based on size of its pieces (from config directives)
     char *fortune_cmd = (char *) malloc((strlen(svr->binloc) + strlen(svr->maxlen) + 10) * sizeof(char));
     sprintf(fortune_cmd, "%s -n %s -s", svr->binloc, svr->maxlen);
@@ -105,16 +105,30 @@ static int mod_fortune_method_handler (request_rec *r)
 */
 static const char * set_fortune_maxlen(cmd_parms *parms, void *dummy, const char *arg)
 {
-    modfortune_config* svr = ap_get_module_config(parms->server->module_config, &fortune_module);
-    
     if (!apr_isdigit(arg[0]))
         return "FortuneMaxLength: length must be numeric";
     
-    int maxlen = atoi((char *)arg);
-    if (maxlen < 1)
+    if (atoi((char *)arg) < 1)
         return "FortuneMaxLength: must be at least one character long";
     
+    modfortune_config* svr = ap_get_module_config(parms->server->module_config, &fortune_module);
     svr->maxlen = (char *) arg;
+    
+    return NULL;
+}
+
+static const char * set_fortune_binloc(cmd_parms *parms, void *dummy, const char *arg)
+{
+    char *binloc = (char *) arg;
+    
+    if (access(binloc, F_OK) < 0)
+        return "FortuneProgram: file must exist";
+    
+    if (access(binloc, X_OK) < 0)
+        return "FortuneProgram: file must be executable";
+    
+    modfortune_config* svr = ap_get_module_config(parms->server->module_config, &fortune_module);
+    svr->binloc = binloc;
     
     return NULL;
 }
@@ -133,8 +147,8 @@ static const command_rec mod_fortune_cmds[] =
     ),
     AP_INIT_TAKE1(
         "FortuneProgram",
-        ap_set_string_slot,
-        (void*)APR_OFFSETOF(modfortune_config, binloc),
+        set_fortune_binloc,
+        NULL,
         OR_ALL,//RSRC_CONF,
         "FortuneProgram <string> -- the location of the executable fortune binary."
     ),
