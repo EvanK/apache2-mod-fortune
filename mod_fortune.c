@@ -64,35 +64,42 @@ static int mod_fortune_method_handler (request_rec *r)
     // Get the module configuration
     modfortune_config* svr = ap_get_module_config(r->server->module_config, &fortune_module);
     
-    // estimate size of fortune output from config directive (short circuit if maxlen is not positive int)
-    int maxlen = atoi(svr->maxlen);
-    char *fortune_output = (char *) malloc((maxlen + 1) * sizeof(char));
-    strcpy(fortune_output, "");
-    
-    // dynamically allocate fortune_cmd based on size of its pieces (from config directives)
-    char *fortune_cmd = (char *) malloc((strlen(svr->binloc) + strlen(svr->maxlen) + 10) * sizeof(char));
-    sprintf(fortune_cmd, "%s -n %s -s", svr->binloc, svr->maxlen);
-    
-    // invoke in a subshell
-    FILE *fortune_pipe;
-    fortune_pipe = popen(fortune_cmd, "r");
-    
-    // if opening pipe fails, log a warning
-    if (fortune_pipe == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "mod_fortune: Failed to open pipe to %s", fortune_cmd);
+    // short circuit early if binloc isnt executable
+    if (access(svr->binloc, X_OK) < 0) {
+        // presumably binloc is the default value, and that binary simply doesnt exist or isnt executable
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "mod_fortune: Failed to find or execute %s", svr->binloc);
     }
-    // otherwise funnel pipe's output into cstring and set as environment variable
     else {
-        int fortune_size = fread(fortune_output, sizeof(char), maxlen, fortune_pipe);
-        fortune_output[ fortune_size ] = '\0';
-        pclose(fortune_pipe);
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, "mod_fortune: Retrieved fortune of %d chars", (int)strlen(fortune_output));
-        apr_table_set(r->subprocess_env, "FORTUNE_COOKIE", mod_fortune_chomp_output(fortune_output) );
+        // estimate size of fortune output from config directive (short circuit if maxlen is not positive int)
+        int maxlen = atoi(svr->maxlen);
+        char *fortune_output = (char *) malloc((maxlen + 1) * sizeof(char));
+        strcpy(fortune_output, "");
+        
+        // dynamically allocate fortune_cmd based on size of its pieces (from config directives)
+        char *fortune_cmd = (char *) malloc((strlen(svr->binloc) + strlen(svr->maxlen) + 10) * sizeof(char));
+        sprintf(fortune_cmd, "%s -n %s -s", svr->binloc, svr->maxlen);
+        
+        // invoke in a subshell
+        FILE *fortune_pipe;
+        fortune_pipe = popen(fortune_cmd, "r");
+        
+        // if opening pipe fails, log a warning
+        if (fortune_pipe == NULL) {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "mod_fortune: Failed to open pipe to %s", fortune_cmd);
+        }
+        // otherwise funnel pipe's output into cstring and set as environment variable
+        else {
+            int fortune_size = fread(fortune_output, sizeof(char), maxlen, fortune_pipe);
+            fortune_output[ fortune_size ] = '\0';
+            pclose(fortune_pipe);
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, "mod_fortune: Retrieved fortune of %d chars", (int)strlen(fortune_output));
+            apr_table_set(r->subprocess_env, "FORTUNE_COOKIE", mod_fortune_chomp_output(fortune_output) );
+        }
+        
+        // deallocate dynamic cstrings we no longer need
+        free(fortune_output);
+        free(fortune_cmd);
     }
-    
-    // deallocate dynamic cstrings we no longer need
-    free(fortune_output);
-    free(fortune_cmd);
     
     // Return DECLINED so that the Apache core will keep looking for
     // other modules to handle this request.  This effectively makes
@@ -101,8 +108,8 @@ static int mod_fortune_method_handler (request_rec *r)
 }
 
 /*
-* Set the max length of fortunes to retrieve
-*/
+ * Set the max length of fortunes to retrieve
+ */
 static const char * set_fortune_maxlen(cmd_parms *parms, void *dummy, const char *arg)
 {
     if (!apr_isdigit(arg[0]))
@@ -117,6 +124,9 @@ static const char * set_fortune_maxlen(cmd_parms *parms, void *dummy, const char
     return NULL;
 }
 
+/*
+ * Set the location of the executable fortune binary
+ */
 static const char * set_fortune_binloc(cmd_parms *parms, void *dummy, const char *arg)
 {
     char *binloc = (char *) arg;
