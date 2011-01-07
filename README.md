@@ -22,6 +22,16 @@ Why?
 I wrote this mostly for fun and because it's been a while since I dabbled in the C language.
 
 
+How?
+--
+There are multiple ways to compile and install an apache module.  My preferred method is to use `apxs`:
+    # build shared object file
+    apxs -c mod_fortune.c 
+    # and install it (may require root/sudo)
+    apxs -i -a mod_fortune.la
+This should not only move the object file into place, but add a *LoadModule* directive into your apache configuration.
+
+
 Licensing
 --
 This software is released as open source under the MIT license:
@@ -44,3 +54,4 @@ This is an example configuration that would insert an `X-Fortune` header to ever
         # set X-Fortune header for successful response, if env variable exists
         Header onsuccess set X-Fortune %{FORTUNE_COOKIE}e env=FORTUNE_COOKIE
     </IfModule>
+
