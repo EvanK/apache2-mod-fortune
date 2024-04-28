@@ -26,7 +26,7 @@ jobs:
       - name: Build and install module
         run: |
           apxs -c mod_fortune.c
-          apxs -i -a mod_fortune.la
+          sudo apxs -i -a mod_fortune.la
       - name: Ensure module combiled to shared object
         run: ls -1  /usr/lib/apache2/modules/mod_fortune.so
       - name: Ensure module installed and enabled
