@@ -49,4 +49,4 @@ jobs:
         # run: kill -s USR1 $(cat /usr/local/apache2/logs/httpd.pid)
         # ^^ hopefully can use systemctl or something to do this
       - name: Test for fortune header
-        run: curl -sI http://localhost/ | grep -q X-Fortune
+        run: curl -sI http://localhost/ | grep X-Fortune
