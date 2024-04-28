@@ -1,0 +1,52 @@
+name: Build and test apache module
+
+on:
+  # Triggers on push/pull only for the "master" branch
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+  # Allows running workflow manually
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packages we'll need for building
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install build-essential libtool \
+            apache2 apache2-dev apache2-utils \
+            libapr1-dev libaprutil1-dev \
+            curl fortune
+        # git clone https://github.com/EvanK/apache2-mod-fortune.git ~/a2mf && cd ~/a2mf && apxs -c mod_fortune.c && apxs -i -a mod_fortune.la
+      - name: Build and install module
+        run: |
+          apxs -c mod_fortune.c
+          sudo apxs -i -a mod_fortune.la
+      - name: Ensure module combiled to shared object
+        run: ls -1  /usr/lib/apache2/modules/mod_fortune.so
+      - name: Ensure module installed and enabled
+        run: ls -1 /etc/apache2/mods-enabled/fortune.load
+        # ^^ need to figure correct so and conf paths here and below
+      - name: Add to apache config
+        run: |
+          cat << EOF | sudo tee -a /etc/apache2/apache2.conf
+          <IfModule headers_module>
+            <IfModule fortune_module>
+                FortuneMaxLength 1000
+            </IfModule>
+            Header onsuccess set X-Fortune %{FORTUNE_COOKIE}e env=FORTUNE_COOKIE
+          </IfModule>
+          EOF
+      - name: Enable headers module as we'll need it
+        run: sudo a2enmod headers
+      - name: Gracefully (re)start apache
+        run: sudo apachectl graceful
+        # run: kill -s USR1 $(cat /usr/local/apache2/logs/httpd.pid)
+        # ^^ hopefully can use systemctl or something to do this
+      - name: Test for fortune header
+        run: curl -sI http://localhost/ | grep X-Fortune
