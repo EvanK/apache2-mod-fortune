@@ -34,7 +34,7 @@ jobs:
         # ^^ need to figure correct so and conf paths here and below
       - name: Add to apache config
         run: |
-          sudo cat >> /etc/apache2/apache2.conf << EOF
+          cat << EOF | sudo tee -a /etc/apache2/apache2.conf
           <IfModule headers_module>
             <IfModule fortune_module>
                 FortuneMaxLength 1000
